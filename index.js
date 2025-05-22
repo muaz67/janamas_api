@@ -7,10 +7,10 @@ app.use(cors());
 app.use(express.json());
 
 const dbConfig = {
-  host: 'sql301.infinityfree.com',
-  user: 'if0_38937562',
-  password: 'lpfe26XXBSVndfN',
-  database: 'if0_38937562_janamas',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
 };
 
 const connection = await mysql.createConnection(dbConfig);
