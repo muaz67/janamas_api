@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(cors());
@@ -13,71 +14,48 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
 };
 
-const connection = await mysql.createConnection(dbConfig);
-console.log("DB Connected");
-
+// ✅ ROUTES
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const connection = await mysql.createConnection(dbConfig);
-
-    const [rows] = await connection.execute(
-      'SELECT * FROM users WHERE email = ? AND password = ? LIMIT 1',
-      [email, password]
-    );
-
+    const [rows] = await connection.execute('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
     await connection.end();
 
-    if (rows.length > 0) {
-      const user = rows[0];
+    if (rows.length > 0 && await bcrypt.compare(password, rows[0].password)) {
       res.json({
         status: 'success',
         user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
+          id: rows[0].id,
+          name: rows[0].name,
+          email: rows[0].email,
+          role: rows[0].role,
+        }
       });
     } else {
       res.status(401).json({ status: 'error', message: 'Email atau kata laluan salah' });
     }
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
     res.status(500).json({ status: 'error', message: 'Ralat pelayan' });
   }
 });
 
-app.post('/register', async (req, res) => {
-  const { name, email, password } = req.body;
-
+// ✅ START SERVER PROPERLY
+async function startServer() {
   try {
+    // Just test DB connection once
     const connection = await mysql.createConnection(dbConfig);
-
-    // Check if email exists
-    const [existing] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
-      await connection.end();
-      return res.status(400).json({ status: 'error', message: 'Emel sudah digunakan' });
-    }
-
-    // Insert new user
-    await connection.execute(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-      [name, email, password, 'participant']  // default role = participant
-    );
-
     await connection.end();
+    console.log('✅ Connected to MySQL');
 
-    res.json({ status: 'success', message: 'Pendaftaran berjaya' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 'error', message: 'Ralat pelayan' });
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`🚀 Server berjalan di port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('❌ Failed to connect to DB:', err);
   }
-});
+}
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server berjalan di port ${PORT}`);
-});
+startServer();
